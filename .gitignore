@@ -30,3 +30,13 @@
 *.exe
 *.out
 *.app
+
+# MbedOS
+*.py*
+.vscode
+.build
+.mbed
+.hg
+mbed-os
+BUILD
+
