@@ -16,7 +16,7 @@
  *******************************************************************************/
 #include "liblwm2m.h"
 
-#ifdef ENABLE_RGB_LED
+#ifdef ENABLE_PWM_RGB_LED
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -117,7 +117,10 @@ static uint8_t prv_set_value(lwm2m_data_t * dataP, rgb_data_t * devDataP) {
     switch (dataP->id) {
     case RES_COLOUR: {
         char * color = get_color(devDataP);
-        lwm2m_data_encode_int((int64_t)(*color),dataP);
+    
+        printf("\n#### READ RGB: %s\n",color);
+
+        lwm2m_data_encode_string(color,dataP);
         return COAP_205_CONTENT ;
     }
     case RES_ON_OFF: {
@@ -194,6 +197,9 @@ static uint8_t prv_rgb_write(uint16_t instanceId, int numData, lwm2m_data_t * da
     do {
         switch (dataArray[i].id) {
         case RES_COLOUR:
+
+            printf("\n#### READ RGB: %s\n",(char*) dataArray[i].value.asBuffer.buffer);
+
             if (-1 != set_color((char*) dataArray[i].value.asBuffer.buffer, dataArray[i].value.asBuffer.length, (rgb_data_t*) (objectP->userData))) {
                 result = COAP_204_CHANGED;
             } else {

@@ -73,16 +73,17 @@ extern "C" {
 #include "er-coap-13/er-coap-13.h"
 #endif
 
-//////////////////////////////////////////////////
+/*******************************************************************************
+* Global definitions
+*******************************************************************************/
 #ifdef MBED_OS_EXAMPLE_WAKAAMA
-// Global definitions
 #define LWM2M_LITTLE_ENDIAN
 #define LWM2M_CLIENT_MODE
 #define LWM2M_WITH_LOGS
 #define SHARED_DEFINITIONS
 #define WAKAAMA_DEFINITIONS
 
-//#define ENABLE_RGB_LED, WIP
+#define ENABLE_PWM_RGB_LED
 #endif
 
 #ifdef LWM2M_SERVER_MODE
@@ -94,10 +95,6 @@ extern "C" {
 #if defined(LWM2M_BOOTSTRAP) && defined(LWM2M_BOOTSTRAP_SERVER_MODE)
 #error "LWM2M_BOOTSTRAP and LWM2M_BOOTSTRAP_SERVER_MODE cannot be defined at the same time!"
 #endif
-
-
-
-
 
 
 /*

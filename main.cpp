@@ -8,11 +8,9 @@ extern "C" {
     //External API
     extern lwm2m_object_t * get_object_device(void);
     extern void free_object_device(lwm2m_object_t * objectP);
-#if 1
-	extern lwm2m_object_t * get_server_object(void);
-	extern lwm2m_object_t * get_security_object(void);
-#else	
-	
+
+
+#ifdef SUPPORT_SECURITY
     extern lwm2m_object_t * get_server_object(int serverId,
                                    const char* binding,
                                    int lifetime,
@@ -22,30 +20,36 @@ extern "C" {
                                      char * bsPskId,
                                      char * psk,
                                      uint16_t pskLen,
-                                     bool isBootstrap);								   
+                                     bool isBootstrap);
+
+#else
+	extern lwm2m_object_t * get_server_object(void);
+	extern lwm2m_object_t * get_security_object(void);
 #endif
 
     extern void free_server_object(lwm2m_object_t * object);
     extern void free_security_object(lwm2m_object_t * objectP);
     extern char * get_server_uri(lwm2m_object_t * objectP, uint16_t secObjInstID);
 }
-#ifdef ENABLE_RGB_LED
+#ifdef ENABLE_PWM_RGB_LED
 lwm2m_object_t * get_object_rgb_led(void);
 #endif
 lwm2m_object_t * get_object_temperature(void);
+/*********************************************/
+/* Global definitions*/
+#define ENDPOINT_NAME "TINYCLOUD_DEMO"
 
-//Global definitions
-#define ENDPOINT_NAME "tinycloud_demo"
-//Connect to the Leshan test server as default: http://leshan.eclipse.org
-//#define LESHAN_SERVER "5.39.83.206"     
-#define LESHAN_SERVER "222.172.106.71"
+/* Connect to the Leshan test server as default: http://leshan.eclipse.org */
+//#define LESHAN_SERVER "5.39.83.206"
+
+/* Connect to tiny cloud test server: 222.172.106.72:5683 */
+#define LESHAN_SERVER "222.172.106.72"
 #define LESHAN_PORT 5683
 #define LESHAN_PORT_STR "5683"
 
-
 #define UDP_PORT 5683
 
-#ifdef ENABLE_RGB_LED
+#ifdef ENABLE_PWM_RGB_LED
 #define DEVICE_OBJ_NUM 5
 #else
 #define DEVICE_OBJ_NUM 4
@@ -85,9 +89,6 @@ void print_state(lwm2m_context_t * lwm2mH)
     lwm2m_server_t * targetP;
 
     fprintf(stderr, "State: ");
-
-
-
 
     switch(lwm2mH->state)
     {
@@ -270,10 +271,9 @@ int init_display()
     //Bootup and display initial information
     lcd.cls();
     lcd.locate(0,0);
-    lcd.printf("mbed-wakaama-example");
+    lcd.printf(ENDPOINT_NAME);
     lcd.locate(0,10);
     lcd.printf("starting...");
-    //wait(2.0); 
     
     return ret; 
 }
@@ -330,19 +330,7 @@ int main()
      * Now the main function fill an array with each object, this list will be later passed to liblwm2m.
      * Those functions are located in their respective object file.
      */
-#if 1
-    objArray[0] = get_security_object();
-    if (NULL == objArray[0])
-    {
-        fprintf(stderr, "Failed to create security object\r\n");
-        return -1;
-    }
-    data.securityObjP = objArray[0];
-
-    objArray[1] = get_server_object();
-
-#else	 
-	 
+#ifdef SUPPORT_SECURITY
     char serverUri[50];
     int serverId = 101;
     char * pskId = NULL;
@@ -364,6 +352,16 @@ int main()
     }
     data.securityObjP = objArray[0];
     objArray[1] = get_server_object(serverId, "U", LWM2M_SERVER_TIMEOUT, false);
+#else
+    objArray[0] = get_security_object();
+    if (NULL == objArray[0])
+    {
+        fprintf(stderr, "Failed to create security object\r\n");
+        return -1;
+    }
+    data.securityObjP = objArray[0];
+
+    objArray[1] = get_server_object();
 #endif
     if (NULL == objArray[1])
     {
@@ -385,7 +383,7 @@ int main()
         return -1;
     }
     
-#ifdef ENABLE_RGB_LED
+#ifdef ENABLE_PWM_RGB_LED
     objArray[4] = get_object_rgb_led();
     if (NULL == objArray[4])
     {
