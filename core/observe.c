@@ -397,6 +397,7 @@ void lwm2m_resource_value_changed(lwm2m_context_t * contextP,
                                   lwm2m_uri_t * uriP)
 {
     lwm2m_observed_t * targetP;
+    LOG("#### Entering>>>>>>>>>>>>>>>");
 
     LOG_URI(uriP);
     targetP = contextP->observedList;
@@ -438,7 +439,7 @@ void observe_step(lwm2m_context_t * contextP,
 {
     lwm2m_observed_t * targetP;
 
-    LOG("Entering");
+    LOG("#### Entering");
     for (targetP = contextP->observedList ; targetP != NULL ; targetP = targetP->next)
     {
         lwm2m_watcher_t * watcherP;
@@ -453,9 +454,12 @@ void observe_step(lwm2m_context_t * contextP,
         coap_packet_t message[1];
         time_t interval;
 
+
+        LOG("#### Entering>>>>>>>>>>>>>>>1");
         LOG_URI(&(targetP->uri));
         if (LWM2M_URI_IS_SET_RESOURCE(&targetP->uri))
         {
+
             if (COAP_205_CONTENT != object_readData(contextP, &targetP->uri, &size, &dataP)) continue;
             switch (dataP->type)
             {
@@ -470,17 +474,24 @@ void observe_step(lwm2m_context_t * contextP,
             default:
                 break;
             }
+
+            lwm2m_resource_value_changed(contextP, &targetP->uri);
+
         }
+        LOG("#### Entering>>>>>>>>>>>>>>>2");
         for (watcherP = targetP->watcherList ; watcherP != NULL ; watcherP = watcherP->next)
         {
+            LOG_ARG("#### observe_step1:%s\n",(watcherP->active==true)?"true":"false");
+
             if (watcherP->active == true)
             {
                 bool notify = false;
 
+                LOG_ARG("#### observe_step2:%s\n",(watcherP->update == true)?"true":"false");
                 if (watcherP->update == true)
                 {
                     // value changed, should we notify the server ?
-
+                    LOG_ARG("#### observe_step3:%s,%d\n",(watcherP->parameters == NULL)?"true":"false",watcherP->parameters->toSet);
                     if (watcherP->parameters == NULL || watcherP->parameters->toSet == 0)
                     {
                         // no conditions

@@ -310,6 +310,7 @@ coap_status_t dm_handleRequest(lwm2m_context_t * contextP,
                 }
                 else
                 {
+                    printf("\n### SET PARAMETERS!!!!\n");
                     result = observe_setParameters(contextP, uriP, serverP, &attr);
                 }
             }

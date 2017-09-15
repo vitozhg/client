@@ -60,7 +60,7 @@ lwm2m_object_t * get_object_temperature(void);
 //#define LWM2M_CLIENT_TIMEOUT   10
 //#define LWM2M_SERVER_TIMEOUT   20
 
-#define UDP_TIMEOUT 6000    //ms
+#define UDP_TIMEOUT 1000    //ms
 #define LWM2M_CLIENT_TIMEOUT   60
 #define LWM2M_SERVER_TIMEOUT   60
 
