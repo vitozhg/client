@@ -1,7 +1,10 @@
+#include "config.h"
+
 #include "mbed.h"
 #include "C12832.h"
 #include "LM75B.h"
 #include "EthernetInterface.h"
+
 
 extern "C" {
     #include "liblwm2m.h"
@@ -64,22 +67,38 @@ lwm2m_object_t * get_object_temperature(void);
 #define LWM2M_CLIENT_TIMEOUT   60
 #define LWM2M_SERVER_TIMEOUT   60
 
-
-
 // LCD 128X32
 C12832 lcd(p5, p7, p6, p8, p11);
 // Sensor of temperature
 LM75B sensor_temp(p28,p27);
+
+SocketAddress server(LESHAN_SERVER, LESHAN_PORT);
+SocketAddress client;
+
+#if defined(NETWORK_SUPPORT_ETHERNET)
 // Network interface
-EthernetInterface eth;
-// UDP Socket
-UDPSocket udp;
+EthernetInterface net;
+#elif defined(NETWORK_SUPPORT_WIFI)
+#include "ESP8266Interface.h"
+ESP8266Interface net(MBED_CFG_ESP8266_TX, MBED_CFG_ESP8266_RX, MBED_CFG_ESP8266_DEBUG);
+#endif
+
+#ifdef MBED_CFG_ESP8266_TCP
+TCPSocket sock;
+#else
+UDPSocket sock;
+#endif
+
 // Serial Port
 Serial pc(USBTX, USBRX);
 typedef struct
 {
     lwm2m_object_t * securityObjP;
+    #ifdef MBED_CFG_ESP8266_TCP
+    TCPSocket sock;
+    #else
     UDPSocket sock;
+    #endif
     /*connection_t * connList;*/
 } client_data_t;
 
@@ -201,7 +220,7 @@ void print_state(lwm2m_context_t * lwm2mH)
 
 void debug_dump(uint8_t * buffer, size_t length)
 {
-    int i;
+    size_t i;
     printf("\n--------------------------\n"); 
     for(i=0;i<length;i++){
         printf("0x%2x ",buffer[i]);
@@ -209,10 +228,13 @@ void debug_dump(uint8_t * buffer, size_t length)
     }   
     printf("\n--------------------------\n"); 
 }
-void test_tcp(EthernetInterface eth)
+
+
+#if defined(NETWORK_SUPPORT_ETHERNET)
+void test_tcp(EthernetInterface net)
 {
     TCPSocket tcp;    
-    tcp.open(&eth);
+    tcp.open(&net);
     tcp.connect("developer.mbed.org", 80);
 
     // Send a simple http request
@@ -238,32 +260,72 @@ void test_tcp(EthernetInterface eth)
     tcp.close();   
 }
 
-
 int init_network()
 {
     int ret = 0;
 
     //try to connect and get ip via DHCP.
     lcd.locate(0,10);
-    lcd.printf("obtaining ip address...\n");
-    ret = eth.connect();
+    lcd.printf("Netowrk Connecting...\n");
+    ret = net.connect();
     if(ret!=0){
-        lcd.printf("DHCP Error - No IP");
+        lcd.printf("Connect Failed!");
         return ret;
     }
-    lcd.printf("IP is %s\n", eth.get_ip_address());
+    lcd.locate(0,10);
+    lcd.printf("Netowrk Connected:\n");
+    lcd.printf("Client IP is %s\n", net.get_ip_address());
     //wait(2.0);
     
     //test code which only used to verify the connect functinon
-    //test_tcp(eth);
-    //test_udp(eth);
+    //test_tcp(net);
+    //test_udp(net);
     
-    udp.open(&eth);
-    udp.set_timeout(UDP_TIMEOUT);
-    udp.bind(UDP_PORT);
+    sock.open(&net);
+    sock.set_timeout(UDP_TIMEOUT);
+    sock.bind(UDP_PORT);
     
     return ret;    
 }
+#elif defined(NETWORK_SUPPORT_WIFI)
+int init_network()
+{
+    int ret = 0;
+
+    //try to connect and get ip via DHCP.
+    lcd.locate(0,10);
+    lcd.printf("Netowrk Connecting...\n");
+
+    net.set_credentials(MBED_CFG_ESP8266_SSID, MBED_CFG_ESP8266_PASS);
+    ret = net.connect();
+    if(ret!=0){
+        lcd.printf("Connect Failed!");
+        return ret;
+    }
+    lcd.locate(0,10);
+    lcd.printf("Netowrk Connected:\n");
+    lcd.printf("Client IP is %s\n", net.get_ip_address());
+
+    printf("MBED: IP Address %s\r\n", net.get_ip_address());
+    printf("MBED: Netmask %s\r\n", net.get_netmask());
+    printf("MBED: Gateway %s\r\n", net.get_gateway());
+    
+#ifdef MBED_CFG_ESP8266_TCP
+    ret = sock.open(&net);
+    MBED_ASSERT(ret==0);
+
+    ret = sock.connect(server);
+    MBED_ASSERT(ret==0);
+#else
+    // TBD.
+    sock.open(&net);
+    sock.set_timeout(UDP_TIMEOUT);
+    sock.bind(UDP_PORT);
+#endif
+
+    return ret;    
+}
+#endif
 
 int init_display()
 {
@@ -278,17 +340,19 @@ int init_display()
     return ret; 
 }
 
-
 coap_status_t lwm2m_buffer_send(void * sessionH,uint8_t * buffer,size_t length,void * userdata)
 {
-    int ret = 0;
+    size_t ret = 0;
     
     SocketAddress * addr = (SocketAddress*) sessionH;
     printf("@@@sessionH = %d\n",sessionH);
     printf("\n>>>>>Send packet to: %s of port %d, size: %d\n\n", addr->get_ip_address(), addr->get_port(),length);
     //debug_dump(buffer,length);
-    
-    ret = udp.sendto(addr->get_ip_address(), addr->get_port(), (void *)buffer, (int)length);
+#ifdef MBED_CFG_ESP8266_TCP
+    ret = sock.send((void *)buffer, (int)length);
+#else
+    ret = sock.sendto(addr->get_ip_address(), addr->get_port(), (void *)buffer, (int)length);
+#endif
     if(ret!=length)
     {
         return COAP_500_INTERNAL_SERVER_ERROR;
@@ -313,17 +377,16 @@ int main()
     lwm2m_object_t * objArray[DEVICE_OBJ_NUM];
     lwm2m_security_t security;
     client_data_t data; 
-    data.sock = udp;
+    data.sock = sock;
     
     //Init the lwm2m server, set Leshan as default
-    SocketAddress server(LESHAN_SERVER, LESHAN_PORT);
-    SocketAddress client;
+
 
     pc.baud (115200);
 
     //Init display modual via LCD
     init_display();
-    //Init the network modual via ethernet and udp socket
+    //Init the network modual via ethernet and  socket
     init_network(); 
     
     /*
@@ -403,7 +466,7 @@ int main()
         return -1;
     }    
 
-    printf("ontextP->endpointName %d , contextP->objectList %d\n", lwm2mH->endpointName, lwm2mH->objectList);
+    printf("ontextP->endpointName %s\n", lwm2mH->endpointName);
     /*
      * We configure the liblwm2m library with the name of the client - which shall be unique for each client -
      * the number of objects we will be passing through and the objects array
@@ -445,9 +508,13 @@ int main()
             printf("lwm2m_step() failed: 0x%x\r\n", result);
             return -1;
         }
-
         printf("\n---------------------------------------------------------------------------------\n");
-        numBytes = udp.recvfrom(&server1, buffer, sizeof(buffer));
+
+#ifdef MBED_CFG_ESP8266_TCP
+        numBytes = sock.recv(buffer, sizeof(buffer));
+#else
+        numBytes = sock.recvfrom(&server1, buffer, sizeof(buffer));
+#endif
         if(numBytes <=0){
             printf("Error in recvfrom() - ret = %d\r\n",numBytes);
         }
@@ -461,5 +528,4 @@ int main()
     }//while()
 
 }//main
-
 

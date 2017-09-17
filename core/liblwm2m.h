@@ -64,8 +64,7 @@ extern "C" {
 #include <stdbool.h>
 #include <time.h>
 
-
-#define MBED_OS_EXAMPLE_WAKAAMA
+#include "config.h"
 
 #ifdef MBED_OS_EXAMPLE_WAKAAMA
 #include <stdlib.h>
@@ -82,8 +81,6 @@ extern "C" {
 #define LWM2M_WITH_LOGS
 #define SHARED_DEFINITIONS
 #define WAKAAMA_DEFINITIONS
-
-#define ENABLE_PWM_RGB_LED
 #endif
 
 #ifdef LWM2M_SERVER_MODE
